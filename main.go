@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/gofiber/fiber/v2"
 	"google.golang.org/grpc"
 )
 
@@ -20,20 +21,38 @@ func (s *server) SayHello(ctx context.Context, in *model.HelloRequest) (*model.H
 }
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:50051"))
+	app := fiber.New(fiber.Config{
+		AppName: "GRPC Server . . .",
+	})
+
+	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:8001"))
 
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
 
-	s := grpc.NewServer()
-	model.RegisterGreeterServer(s, &server{})
+	go func() {
+		s := grpc.NewServer()
+		model.RegisterGreeterServer(s, &server{})
 
-	log.Println("Server registered")
+		err = s.Serve(lis)
 
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
+		log.Println("Server registered")
+		if err != nil {
+			log.Fatalf("failed to serve: %v", err)
+		}
+
+	}()
+
+	go func() {
+		log.Fatal(app.Listen(":5051"))
+	}()
+
+	<-ctx.Done()
+
+	defer cancel()
+	log.Println("Shutting downclear")
 
 }
